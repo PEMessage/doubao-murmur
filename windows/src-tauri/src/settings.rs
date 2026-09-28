@@ -62,6 +62,45 @@ impl ToggleKey {
     }
 }
 
+/// How the toggle key drives dictation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HotkeyMode {
+    /// Tap the key to start and tap again to stop. Matches macOS and Linux.
+    Toggle,
+    /// Hold the key to record and release it to stop (push-to-talk).
+    Hold,
+}
+
+impl HotkeyMode {
+    pub const ALL: [HotkeyMode; 2] = [HotkeyMode::Toggle, HotkeyMode::Hold];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            HotkeyMode::Toggle => "点按切换（默认）",
+            HotkeyMode::Hold => "按住说话（松开结束）",
+        }
+    }
+
+    pub fn short_label(self) -> &'static str {
+        match self {
+            HotkeyMode::Toggle => "点按切换",
+            HotkeyMode::Hold => "按住说话",
+        }
+    }
+
+    pub fn id(self) -> &'static str {
+        match self {
+            HotkeyMode::Toggle => "mode_toggle",
+            HotkeyMode::Hold => "mode_hold",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<HotkeyMode> {
+        HotkeyMode::ALL.into_iter().find(|mode| mode.id() == id)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PasteMode {
@@ -75,6 +114,9 @@ pub enum PasteMode {
 pub struct Settings {
     #[serde(default = "default_toggle_key")]
     pub toggle_key: ToggleKey,
+    /// Tap-to-toggle or hold-to-talk.
+    #[serde(default = "default_hotkey_mode")]
+    pub hotkey_mode: HotkeyMode,
     /// Swallow the toggle key so the focused app never sees it. Stops a bare Alt
     /// tap from opening menu bars, but also disables AltGr, so it is off by default.
     #[serde(default)]
@@ -87,6 +129,10 @@ fn default_toggle_key() -> ToggleKey {
     ToggleKey::RightAlt
 }
 
+fn default_hotkey_mode() -> HotkeyMode {
+    HotkeyMode::Toggle
+}
+
 fn default_paste_mode() -> PasteMode {
     PasteMode::Clipboard
 }
@@ -95,6 +141,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             toggle_key: default_toggle_key(),
+            hotkey_mode: default_hotkey_mode(),
             suppress_toggle_key: false,
             paste_mode: default_paste_mode(),
         }
@@ -141,6 +188,7 @@ mod tests {
     fn defaults_match_the_other_platforms() {
         let settings = Settings::default();
         assert_eq!(settings.toggle_key, ToggleKey::RightAlt);
+        assert_eq!(settings.hotkey_mode, HotkeyMode::Toggle);
         // Suppression breaks AltGr, so it must stay opt-in.
         assert!(!settings.suppress_toggle_key);
         assert_eq!(settings.paste_mode, PasteMode::Clipboard);
@@ -155,9 +203,23 @@ mod tests {
     }
 
     #[test]
+    fn hotkey_mode_ids_round_trip() {
+        for mode in HotkeyMode::ALL {
+            assert_eq!(HotkeyMode::from_id(mode.id()), Some(mode));
+        }
+        assert_eq!(HotkeyMode::from_id("nope"), None);
+        // The two id namespaces must not collide, or the tray dispatch would
+        // misroute one kind of item as the other.
+        for key in ToggleKey::ALL {
+            assert_eq!(HotkeyMode::from_id(key.id()), None);
+        }
+    }
+
+    #[test]
     fn missing_fields_fall_back_to_defaults() {
         let settings: Settings = serde_json::from_str("{}").unwrap();
         assert_eq!(settings.toggle_key, ToggleKey::RightAlt);
+        assert_eq!(settings.hotkey_mode, HotkeyMode::Toggle);
         assert_eq!(settings.paste_mode, PasteMode::Clipboard);
     }
 }

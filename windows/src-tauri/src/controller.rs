@@ -17,7 +17,7 @@ use crate::audio::AudioCapture;
 use crate::hotkey::{self, HotkeyEvent};
 use crate::overlay::{self, OverlayState};
 use crate::params::{self, AsrParams};
-use crate::settings::{Settings, ToggleKey};
+use crate::settings::{HotkeyMode, Settings, ToggleKey};
 use crate::tray::{self, TrayState};
 use crate::{autostart, config, help, login, paste, updater, win32};
 use crate::{log_error, log_info, log_warn};
@@ -32,6 +32,8 @@ pub enum RecordingState {
 
 pub enum Event {
     HotkeyToggle,
+    HotkeyHoldStart,
+    HotkeyHoldStop,
     HotkeyCancel,
     Asr(AsrEvent),
     SafetyTimeout(u64),
@@ -48,6 +50,7 @@ pub enum Event {
     ToggleAutostart,
     ToggleSuppress,
     SetToggleKey(ToggleKey),
+    SetHotkeyMode(HotkeyMode),
     Quit,
 }
 
@@ -68,13 +71,20 @@ pub fn spawn(app: &AppHandle, settings: Settings) {
 
     // The hook thread speaks its own vocabulary; bridge it onto the event queue.
     let (hotkey_tx, hotkey_rx) = channel::<HotkeyEvent>();
-    hotkey::start(hotkey_tx, settings.toggle_key, settings.suppress_toggle_key);
+    hotkey::start(
+        hotkey_tx,
+        settings.toggle_key,
+        settings.suppress_toggle_key,
+        settings.hotkey_mode,
+    );
     {
         let tx = tx.clone();
         std::thread::spawn(move || {
             while let Ok(event) = hotkey_rx.recv() {
                 let mapped = match event {
                     HotkeyEvent::Toggle => Event::HotkeyToggle,
+                    HotkeyEvent::HoldStart => Event::HotkeyHoldStart,
+                    HotkeyEvent::HoldStop => Event::HotkeyHoldStop,
                     HotkeyEvent::Cancel => Event::HotkeyCancel,
                 };
                 if tx.send(mapped).is_err() {
@@ -142,6 +152,8 @@ impl Controller {
     fn handle(&mut self, event: Event) {
         match event {
             Event::HotkeyToggle => self.on_toggle(),
+            Event::HotkeyHoldStart => self.on_hold_start(),
+            Event::HotkeyHoldStop => self.on_hold_stop(),
             Event::HotkeyCancel => self.cancel(),
             Event::Asr(event) => self.on_asr(event),
             Event::SafetyTimeout(generation) => self.on_safety_timeout(generation),
@@ -164,13 +176,19 @@ impl Controller {
             Event::ToggleSuppress => {
                 self.settings.suppress_toggle_key = !self.settings.suppress_toggle_key;
                 self.settings.save();
-                hotkey::apply(self.settings.toggle_key, self.settings.suppress_toggle_key);
+                self.apply_hotkey();
                 self.refresh_tray();
             }
             Event::SetToggleKey(key) => {
                 self.settings.toggle_key = key;
                 self.settings.save();
-                hotkey::apply(self.settings.toggle_key, self.settings.suppress_toggle_key);
+                self.apply_hotkey();
+                self.refresh_tray();
+            }
+            Event::SetHotkeyMode(mode) => {
+                self.settings.hotkey_mode = mode;
+                self.settings.save();
+                self.apply_hotkey();
                 self.refresh_tray();
             }
             Event::Quit => self.quit(),
@@ -193,6 +211,23 @@ impl Controller {
             RecordingState::Starting | RecordingState::Recording => self.stop_recording(),
             // Already finishing up.
             RecordingState::Stopping => {}
+        }
+    }
+
+    fn on_hold_start(&mut self) {
+        // Hold mode presses the key down; only start from idle so a repeat or a
+        // stray press while stopping cannot restart the session.
+        if self.state == RecordingState::Idle {
+            self.start_recording();
+        }
+    }
+
+    fn on_hold_stop(&mut self) {
+        if matches!(
+            self.state,
+            RecordingState::Starting | RecordingState::Recording
+        ) {
+            self.stop_recording();
         }
     }
 
@@ -469,8 +504,9 @@ impl Controller {
 
     fn show_help(&mut self) {
         let key = self.settings.toggle_key;
+        let mode = self.settings.hotkey_mode;
         on_main(&self.app, move |app| {
-            if let Err(e) = help::show(&app, key) {
+            if let Err(e) = help::show(&app, key, mode) {
                 log_error!("Could not open help: {e}");
             }
         });
@@ -537,11 +573,20 @@ impl Controller {
         });
     }
 
+    fn apply_hotkey(&self) {
+        hotkey::apply(
+            self.settings.toggle_key,
+            self.settings.suppress_toggle_key,
+            self.settings.hotkey_mode,
+        );
+    }
+
     fn refresh_tray(&self) {
         let state = TrayState {
             logged_in: self.logged_in,
             recording: self.state != RecordingState::Idle,
             toggle_key: self.settings.toggle_key,
+            hotkey_mode: self.settings.hotkey_mode,
             suppress_toggle_key: self.settings.suppress_toggle_key,
         };
         on_main(&self.app, move |app| tray::refresh(&app, &state));

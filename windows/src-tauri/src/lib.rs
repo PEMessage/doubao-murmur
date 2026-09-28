@@ -52,6 +52,7 @@ pub fn run() {
                     logged_in: params::has_saved(),
                     recording: false,
                     toggle_key: settings.toggle_key,
+                    hotkey_mode: settings.hotkey_mode,
                     suppress_toggle_key: settings.suppress_toggle_key,
                 },
             )?;

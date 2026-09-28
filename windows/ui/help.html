@@ -76,7 +76,9 @@
 
     <h2>快捷键</h2>
     <ul>
-      <li><kbd id="key">右 Alt</kbd>：开始 / 停止语音识别</li>
+      <li>
+        <kbd id="key">右 Alt</kbd><span id="key-action">：开始 / 停止语音识别</span>
+      </li>
       <li><kbd>ESC</kbd>：取消当前识别（不复制、不粘贴）</li>
     </ul>
 
@@ -84,14 +86,18 @@
     <ol>
       <li>托盘菜单显示「状态：已登录」</li>
       <li>把光标放到任意输入框</li>
-      <li>按一下 <kbd class="key">右 Alt</kbd>，屏幕顶部出现悬浮窗，开始说话</li>
+      <li id="step-start">按一下 <kbd class="key">右 Alt</kbd>，屏幕顶部出现悬浮窗，开始说话</li>
       <li>悬浮窗实时显示识别到的文字</li>
-      <li>再按一下 <kbd class="key">右 Alt</kbd> 结束，文字自动复制并粘贴到输入框</li>
+      <li id="step-stop">再按一下 <kbd class="key">右 Alt</kbd> 结束，文字自动复制并粘贴到输入框</li>
     </ol>
 
     <h2>托盘菜单</h2>
     <ul>
       <li><b>触发热键</b>：换成右 Ctrl / 右 Shift / Scroll Lock / Pause</li>
+      <li>
+        <b>触发方式</b>：点按切换（按一下开始、再按一下结束）或按住说话
+        （按住开始、松开结束）。
+      </li>
       <li>
         <b>拦截热键</b>：让焦点窗口收不到该键，可避免按右 Alt 时唤出菜单栏。
         但会同时禁用 AltGr，欧洲键盘布局请勿开启。
@@ -114,8 +120,20 @@
 
     <script>
       const name = window.__DM_KEY || "右 Alt";
+      const hold = window.__DM_HOLD === true;
+
       document.getElementById("key").textContent = name;
       document.querySelectorAll(".key").forEach((node) => (node.textContent = name));
+      document.getElementById("key-action").textContent = hold
+        ? "：按住说话，松开结束"
+        : "：开始 / 停止语音识别";
+
+      if (hold) {
+        document.getElementById("step-start").innerHTML =
+          `按住 <kbd class="key">${name}</kbd>，屏幕顶部出现悬浮窗，开始说话`;
+        document.getElementById("step-stop").innerHTML =
+          `松开 <kbd class="key">${name}</kbd> 结束，文字自动复制并粘贴到输入框`;
+      }
     </script>
   </body>
 </html>

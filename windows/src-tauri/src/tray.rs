@@ -5,7 +5,7 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Wry};
 
 use crate::controller::Event;
-use crate::settings::ToggleKey;
+use crate::settings::{HotkeyMode, ToggleKey};
 use crate::{autostart, log_warn};
 
 pub const TRAY_ID: &str = "main";
@@ -27,6 +27,7 @@ pub struct TrayState {
     pub logged_in: bool,
     pub recording: bool,
     pub toggle_key: ToggleKey,
+    pub hotkey_mode: HotkeyMode,
     pub suppress_toggle_key: bool,
 }
 
@@ -34,7 +35,11 @@ fn tooltip(state: &TrayState) -> String {
     if state.recording {
         "Doubao Murmur — 正在识别…".to_string()
     } else if state.logged_in {
-        format!("Doubao Murmur — 已登录（{}）", state.toggle_key.short_label())
+        format!(
+            "Doubao Murmur — 已登录（{} · {}）",
+            state.toggle_key.short_label(),
+            state.hotkey_mode.short_label()
+        )
     } else {
         "Doubao Murmur — 未登录".to_string()
     }
@@ -80,6 +85,25 @@ fn build_menu(app: &AppHandle, state: &TrayState) -> tauri::Result<Menu<Wry>> {
         .collect();
     let hotkeys = Submenu::with_id_and_items(app, "hotkeys", "触发热键", true, &key_refs)?;
 
+    let mode_items: Vec<CheckMenuItem<Wry>> = HotkeyMode::ALL
+        .into_iter()
+        .map(|mode| {
+            CheckMenuItem::with_id(
+                app,
+                mode.id(),
+                mode.label(),
+                true,
+                mode == state.hotkey_mode,
+                None::<&str>,
+            )
+        })
+        .collect::<tauri::Result<_>>()?;
+    let mode_refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> = mode_items
+        .iter()
+        .map(|item| item as &dyn tauri::menu::IsMenuItem<Wry>)
+        .collect();
+    let modes = Submenu::with_id_and_items(app, "modes", "触发方式", true, &mode_refs)?;
+
     let suppress = CheckMenuItem::with_id(
         app,
         ids::SUPPRESS,
@@ -112,6 +136,7 @@ fn build_menu(app: &AppHandle, state: &TrayState) -> tauri::Result<Menu<Wry>> {
             &help,
             &PredefinedMenuItem::separator(app)?,
             &hotkeys,
+            &modes,
             &suppress,
             &autostart_item,
             &PredefinedMenuItem::separator(app)?,
@@ -167,9 +192,12 @@ fn dispatch(app: &AppHandle, id: &str) {
         ids::AUTOSTART => Event::ToggleAutostart,
         ids::SUPPRESS => Event::ToggleSuppress,
         ids::QUIT => Event::Quit,
-        other => match ToggleKey::from_id(other) {
-            Some(key) => Event::SetToggleKey(key),
-            None => return,
+        other => match HotkeyMode::from_id(other) {
+            Some(mode) => Event::SetHotkeyMode(mode),
+            None => match ToggleKey::from_id(other) {
+                Some(key) => Event::SetToggleKey(key),
+                None => return,
+            },
         },
     };
 

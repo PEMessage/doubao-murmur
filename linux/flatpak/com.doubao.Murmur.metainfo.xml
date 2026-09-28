@@ -25,6 +25,16 @@
   <url type="homepage">https://github.com/lilong7676/doubao-murmur</url>
   <developer_name>lilong7676</developer_name>
   <releases>
+    <release version="1.5.2" date="2026-09-28">
+      <description>
+        <p>Adds a "hold to talk" mode to the Windows app. In the tray menu under
+           触发方式, choose 按住说话 to hold the hotkey (past a short threshold)
+           to start recording and release it to stop, instead of the default
+           tap-to-toggle. Short taps do nothing in that mode and AltGr chords
+           still work, because the hold only arms once the key has been held
+           without another key pressed.</p>
+      </description>
+    </release>
     <release version="1.5.1" date="2026-08-13">
       <description>
         <p>Keeps the last word or two of a transcription that used to go missing
