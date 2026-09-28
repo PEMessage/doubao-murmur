@@ -73,9 +73,9 @@ pub const STOP_SAFETY_TIMEOUT: Duration = Duration::from_millis(1500);
 pub const FINAL_RESULT_QUIET_PERIOD: Duration = Duration::from_millis(250);
 pub const DEBOUNCE_INTERVAL: Duration = Duration::from_millis(300);
 /// How long the toggle key must be held before "hold to talk" mode starts
-/// recording. A short tap still does nothing in that mode, and the delay keeps
-/// AltGr+<key> chords from flickering the overlay.
-pub const HOLD_THRESHOLD: Duration = Duration::from_millis(350);
+/// recording. Kept short so push-to-talk feels responsive; holding past this
+/// with no other key down is treated as a hold rather than an AltGr chord.
+pub const HOLD_THRESHOLD: Duration = Duration::from_millis(150);
 pub const PASTE_DELAY: Duration = Duration::from_millis(80);
 pub const AUTH_EXPIRY_DELAY: Duration = Duration::from_secs(2);
 pub const LOGIN_POLL_INTERVAL: Duration = Duration::from_millis(1200);

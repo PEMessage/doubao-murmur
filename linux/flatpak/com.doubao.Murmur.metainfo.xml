@@ -25,6 +25,13 @@
   <url type="homepage">https://github.com/lilong7676/doubao-murmur</url>
   <developer_name>lilong7676</developer_name>
   <releases>
+    <release version="1.5.3" date="2026-09-29">
+      <description>
+        <p>Shortens the Windows "hold to talk" threshold from 350 ms to 150 ms,
+           so push-to-talk starts recording almost as soon as the hotkey is
+           held down.</p>
+      </description>
+    </release>
     <release version="1.5.2" date="2026-09-28">
       <description>
         <p>Adds a "hold to talk" mode to the Windows app. In the tray menu under
